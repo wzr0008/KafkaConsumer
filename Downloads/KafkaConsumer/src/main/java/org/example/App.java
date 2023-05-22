@@ -1,15 +1,14 @@
 package org.example;
 
 import com.sun.org.apache.xalan.internal.xsltc.compiler.Pattern;
-import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.StringDeserializer;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 
 /**
@@ -20,6 +19,7 @@ public class App
 {
     public static void main( String[] args )
     {
+        Map<Long,Long> offsetInPartition=new HashMap<>();
         Properties properties = new Properties();
         properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG,"localhost:9092");
         properties.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
@@ -27,8 +27,6 @@ public class App
         properties.put(ConsumerConfig.GROUP_ID_CONFIG,"test");
         properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG,"false");
         KafkaConsumer<String, String> consumer = new KafkaConsumer<String, String>(properties);
-        ArrayList<String> topics = new ArrayList<>();
-        topics.add("test");
         ArrayList<TopicPartition> topicPartitions = new ArrayList<>();
         topicPartitions.add(new TopicPartition("test",0));
         consumer.assign(topicPartitions);
@@ -37,8 +35,21 @@ public class App
             for(ConsumerRecord<String,String> p:poll){
                 System.out.println(p.value());
             }
-            consumer.commitAsync();
-        }
+            consumer.commitAsync(new OffsetCommitCallback() {
 
+                @Override
+                public void onComplete(Map<TopicPartition, OffsetAndMetadata> map, Exception e) {
+                    if(e!=null){
+                        System.out.println("We can do it");
+                    }else{
+                          for(TopicPartition key:map.keySet()){
+                              offsetInPartition.put((long)key.partition(),map.get(key).offset());
+                              System.out.println("The partition is "+key.partition());
+                              System.out.println("The offset is "+map.get(key).offset());
+                          }
+                    }
+                }
+            });
+        }
     }
 }
